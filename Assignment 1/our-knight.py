@@ -3,17 +3,17 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 12, 18:01:39
-@last modified : 2021 Feb 12, 18:28:02
+@last modified : 2021 Feb 13, 11:13:43
 """
 
 import argparse
+from utils import get_knight_args
+
+def knight_solver(n_rows, n_columns, x_start, y_start):
+    raise NotImplementedError()
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser(description="Knight solver")
-    parser.add_argument('n_rows', type=int, help="number of rows")
-    parser.add_argument('n_columns', type=int, help="number of columns")
-    parser.add_argument('y_start', type=int, help="y coordinate of starting point")
-    parser.add_argument('x_start', type=int, help="x coordinate of starting point")
-    args = parser.parse_args()
+    args = get_knight_args()
 
+    knight_solver(args.n_rows, args.n_columns, args.x_start, args.y_start)
 
