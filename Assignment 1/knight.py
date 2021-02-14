@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 13, 12:10:58
-@last modified : 2021 Feb 14, 13:37:38
+@last modified : 2021 Feb 14, 17:49:36
 """
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
@@ -14,9 +14,39 @@ import sys
 import copy as copylib
 from search import *
 
-# KNIGHT = '♞'
-KNIGHT = "♘"
-VISITED_TILE = "X"
+KNIGHT = "♘"  # u"\u2658"
+VISITED_TILE = "♞"  # u"\u265E"
+NOT_VISITED_TILE = " "
+
+#################
+#   Key class   #
+#################
+
+class Key:
+    @classmethod
+    def naive(cls, position):
+        """Return 0 whatever the position
+
+        :param position: current position (y, x)
+        """
+        return 0
+
+    @classmethod
+    def border(cls, position, nRows, nCols):
+        """Give the distance between the current position and the closest
+        border
+
+        :param position: current position (y, x)
+        :param nRows: number of rows of the grid
+        :param nCols: number of columns of the grid
+        """
+        return min(
+            position[0] ** 2 + position[1] ** 2,
+            position[0] ** 2 + (state.nCols - position[1] - 1) ** 2,
+            (state.nRows - position[0] - 1) ** 2 + position[1] ** 2,
+            (state.nCols - position[1] - 1) ** 2 + (state.nRows - position[0] - 1) ** 2,
+        )
+
 
 #################
 # Problem class #
@@ -25,7 +55,7 @@ class Knight(Problem):
     """Knight."""
 
     AVAILABLE_MOVES = [
-        (1, -1),
+        (-2, -1),
         (-1, -2),
         (2, -1),
         (-1, 2),
@@ -33,28 +63,14 @@ class Knight(Problem):
         (1, 2),
         (-2, 1),
         (1, -2),
-    ]  # List all possible moves for a knight
+    ]  # List all possible moves for a knight (L shape)
 
     def successor(self, state):
-        """Yield all possible next states in descending order (order given by
+        """Yield all possible next states in ascending order (order given by
         `_border`)
 
         :param state: the current state
         """
-
-        def _border(position):
-            """Give the distance between the current position and the closest
-            border
-
-            :param position: current position (y, x)
-            """
-            return min(
-                position[0] ** 2 + position[1] ** 2,
-                position[0] ** 2 + (state.nCols - position[1] - 1) ** 2,
-                (state.nRows - position[0] - 1) ** 2 + position[1] ** 2,
-                (state.nCols - position[1] - 1) ** 2
-                + (state.nRows - position[0] - 1) ** 2,
-            )
 
         def _valid_pos(y, x):
             """Return True if the position is within the borders and
@@ -66,7 +82,7 @@ class Knight(Problem):
             return (
                 0 <= x < state.nCols
                 and 0 <= y < state.nRows
-                and state.grid[y][x] != KNIGHT
+                and state.grid[y][x] == NOT_VISITED_TILE
             )
 
         positions = []
@@ -76,15 +92,16 @@ class Knight(Problem):
                 # print(f"Valid pos :: ({new_y} , {new_x})")
                 positions.append((new_y, new_x))
 
-        positions = sorted(positions, key=_border, reverse=True)
+        positions = sorted(positions, key=Key.naive, reverse=True)
         for pos in positions:
-            new_state = state.new_state(pos)
+            new_state = state.next_state(pos)
             yield (0, new_state)
 
     def goal_test(self, state):
-        """Return True is the state is the goal state
+        """Return True is the state is the goal state i.e. we have visited all
+        tiles (nRows * nCols)
 
-        :param state: the current state 
+        :param state: the current state
         """
         return state.n_visited == state.nRows * state.nCols
 
@@ -104,7 +121,7 @@ class State:
         :param init_pos:
         """
         self.shape = self.nRows, self.nCols = shape
-        self.n_visited = n_visited 
+        self.n_visited = n_visited
         self.grid = []
         for i in range(self.nRows):
             self.grid.append([" "] * self.nCols)
@@ -117,33 +134,16 @@ class State:
         self.init_pos = self.y, self.x = init_pos
         self.grid[self.y][self.x] = KNIGHT
 
-    def new_state(self, pos):
+    def next_state(self, position):
+        """Return the next state corresponding to the same state as self with
+        new position
+
+        :param position: the new position (y, x)
+        """
         prev_y, prev_x = self.y, self.x
-        st = State(self.shape, pos, grid=self.grid, n_visited=self.n_visited)
+        st = State(self.shape, position, grid=self.grid, n_visited=self.n_visited)
         st.grid[prev_y][prev_x] = VISITED_TILE
         return st
-
-    def next_state(self, pos):
-        st = copylib.copy(self)
-        st.n_visited += 1
-        st.grid[self.y][self.x] = VISITED_TILE
-        st.y, st.x = pos
-        st.grid[st.y][st.x] = KNIGHT
-        return st
-
-    def DEP_new_state(self, pos, ret=True, copy=True):
-        """new_state.
-
-        :param pos:
-        :param ret:
-        :param copy:
-        """
-        st = copylib.copy(self) if copy else self
-        st.y, st.x = pos
-        st.grid[st.y][st.x] = KNIGHT
-        st.n_visited += 1
-        if ret:
-            return st
 
     def __str__(self):
         """__str__."""
@@ -157,7 +157,7 @@ class State:
             s = s[:-1]
             s += "#"
             if i < self.nRows - 1:
-                s += '\n'
+                s += "\n"
         s += "\n"
         s += "#" * n_sharp
         return s
@@ -174,24 +174,24 @@ if __name__ == "__main__":
         # Comment it and uncomment the next one if you want to submit your code on INGInious
         with open("instances.txt") as f:
             instances = f.read().splitlines()
-    
+
         for instance in instances:
             elts = instance.split(" ")
             shape = (int(elts[0]), int(elts[1]))
             init_pos = (int(elts[2]), int(elts[3]))
             init_state = State(shape, init_pos)
-    
+
             problem = Knight(init_state)
-    
+
             # example of bfs tree search
             startTime = time.perf_counter()
             node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
             endTime = time.perf_counter()
-    
+
             # example of print
             path = node.path()
             path.reverse()
-    
+
             print("Number of moves: " + str(node.depth))
             for n in path:
                 print(
@@ -210,18 +210,18 @@ if __name__ == "__main__":
         shape = (int(sys.argv[1]), int(sys.argv[2]))
         init_pos = (int(sys.argv[3]), int(sys.argv[4]))
         init_state = State(shape, init_pos)
-    
+
         problem = Knight(init_state)
-    
+
         # example of bfs tree search
         startTime = time.perf_counter()
         node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
         endTime = time.perf_counter()
-    
+
         # example of print
         path = node.path()
         path.reverse()
-    
+
         print("Number of moves: " + str(node.depth))
         for n in path:
             print(
