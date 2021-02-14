@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 13, 12:10:58
-@last modified : 2021 Feb 14, 17:49:36
+@last modified : 2021 Feb 14, 18:06:14
 """
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
@@ -12,6 +12,7 @@
 import time
 import sys
 import copy as copylib
+from functools import partial
 from search import *
 
 KNIGHT = "♘"  # u"\u2658"
@@ -22,29 +23,31 @@ NOT_VISITED_TILE = " "
 #   Key class   #
 #################
 
+
 class Key:
     @classmethod
-    def naive(cls, position):
+    def naive(cls, position, state):
         """Return 0 whatever the position
 
-        :param position: current position (y, x)
+        :param position: possible next position (y, x)
+        :param state: current state
         """
         return 0
 
     @classmethod
-    def border(cls, position, nRows, nCols):
+    def border(cls, position, state):
         """Give the distance between the current position and the closest
         border
 
-        :param position: current position (y, x)
-        :param nRows: number of rows of the grid
-        :param nCols: number of columns of the grid
+        :param position: possible next position (y, x)
+        :param state: current state
         """
+        y, x = position
         return min(
-            position[0] ** 2 + position[1] ** 2,
-            position[0] ** 2 + (state.nCols - position[1] - 1) ** 2,
-            (state.nRows - position[0] - 1) ** 2 + position[1] ** 2,
-            (state.nCols - position[1] - 1) ** 2 + (state.nRows - position[0] - 1) ** 2,
+            y ** 2 + x ** 2,
+            y ** 2 + (state.nCols - x - 1) ** 2,
+            (state.nRows - y - 1) ** 2 + x ** 2,
+            (state.nCols - x - 1) ** 2 + (state.nRows - y - 1) ** 2,
         )
 
 
@@ -92,7 +95,7 @@ class Knight(Problem):
                 # print(f"Valid pos :: ({new_y} , {new_x})")
                 positions.append((new_y, new_x))
 
-        positions = sorted(positions, key=Key.naive, reverse=True)
+        positions = sorted(positions, key=partial(Key.border, state=state), reverse=True)
         for pos in positions:
             new_state = state.next_state(pos)
             yield (0, new_state)
