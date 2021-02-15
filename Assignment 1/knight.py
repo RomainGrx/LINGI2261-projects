@@ -146,6 +146,7 @@ class State:
         prev_y, prev_x = self.y, self.x
         st = State(self.shape, position, grid=self.grid, n_visited=self.n_visited)
         st.grid[prev_y][prev_x] = VISITED_TILE
+        self.n_visited += 1
         return st
 
     def __str__(self):
