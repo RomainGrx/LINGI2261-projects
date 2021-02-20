@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 13, 12:10:58
-@last modified : 2021 Feb 20, 11:08:47
+@last modified : 2021 Feb 20, 17:13:13
 """
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
@@ -22,7 +22,6 @@ NOT_VISITED_TILE = " "
 #################
 #   Key class   #
 #################
-
 
 class Key:
     @classmethod
@@ -66,8 +65,6 @@ class Key:
         return count
 
 
-
-
 #################
 # Problem class #
 #################
@@ -96,7 +93,7 @@ class Knight(Problem):
         return (
             0 <= x < state.nCols
             and 0 <= y < state.nRows
-            and state.grid[y][x] == NOT_VISITED_TILE
+            and state.grid[y][x] != VISITED_TILE
         )
 
     def successor(self, state):
@@ -114,7 +111,7 @@ class Knight(Problem):
                 positions.append(new_pos)
 
         # Sort positions in descending order with order given by Key.*
-        positions = sorted(positions, key=partial(Key.naive, state=state), reverse=True)
+        positions = sorted(positions, key=partial(Key.neighbors, state=state), reverse=True)
         for pos in positions:
             new_state = state.next_state(pos)
             yield (0, new_state)
@@ -125,11 +122,6 @@ class Knight(Problem):
 
         :param state: the current state
         """
-        # for r in state.grid:
-        #     for v in r:
-        #         if v == NOT_VISITED_TILE:
-        #             return False
-        # return True
         return state.n_visited == state.nRows * state.nCols
 
 
@@ -213,7 +205,8 @@ if __name__ == "__main__":
 
             # example of bfs tree search
             startTime = time.perf_counter()
-            node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
+            #node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
+            node, nb_explored, remaining_nodes = depth_first_tree_search(problem)
             endTime = time.perf_counter()
 
             # example of print
@@ -244,6 +237,7 @@ if __name__ == "__main__":
         # example of bfs tree search
         startTime = time.perf_counter()
         node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
+        #node, nb_explored, remaining_nodes = depth_first_tree_search(problem)
         endTime = time.perf_counter()
 
         # example of print
