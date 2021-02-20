@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 13, 12:10:58
-@last modified : 2021 Feb 14, 18:06:14
+@last modified : 2021 Feb 20, 11:08:47
 """
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
@@ -50,6 +50,23 @@ class Key:
             (state.nCols - x - 1) ** 2 + (state.nRows - y - 1) ** 2,
         )
 
+    @classmethod
+    def neighbors(cls, position, state):
+        """Give the number of neighbors tiles not already visited
+
+        :param position: possible next position (y, x)
+        :param state: current state
+        """
+        y, x = position
+        count = 0
+        for dy, dx in Knight.AVAILABLE_MOVES:
+            yy, xx = y+dy, x+dx
+            if Knight.valid_pos(yy, xx, state):
+                count += 1
+        return count
+
+
+
 
 #################
 # Problem class #
@@ -68,34 +85,36 @@ class Knight(Problem):
         (1, -2),
     ]  # List all possible moves for a knight (L shape)
 
+    @classmethod
+    def valid_pos(cls, y, x, state):
+        """Return True if the position is within the borders and
+        the position is not yet visited, else False
+
+        :param y: y coordinate of the position
+        :param x: x coordinate of the position
+        """
+        return (
+            0 <= x < state.nCols
+            and 0 <= y < state.nRows
+            and state.grid[y][x] == NOT_VISITED_TILE
+        )
+
     def successor(self, state):
-        """Yield all possible next states in ascending order (order given by
-        `_border`)
+        """Yield all possible next states in descending order (order given by
+        `Key.*`)
 
         :param state: the current state
         """
 
-        def _valid_pos(y, x):
-            """Return True if the position is within the borders and
-            the position is not yet visited, else False
-
-            :param y: y coordinate of the position
-            :param x: x coordinate of the position
-            """
-            return (
-                0 <= x < state.nCols
-                and 0 <= y < state.nRows
-                and state.grid[y][x] == NOT_VISITED_TILE
-            )
-
+        # Append all valid positions to the `positions` list
         positions = []
-        for mov_y, mov_x in Knight.AVAILABLE_MOVES:
-            new_x, new_y = state.x + mov_x, state.y + mov_y
-            if _valid_pos(new_y, new_x):
-                # print(f"Valid pos :: ({new_y} , {new_x})")
-                positions.append((new_y, new_x))
+        for dy, dx in Knight.AVAILABLE_MOVES:
+            new_pos = state.y + dy, state.x + dx
+            if Knight.valid_pos(*new_pos, state):
+                positions.append(new_pos)
 
-        positions = sorted(positions, key=partial(Key.border, state=state), reverse=True)
+        # Sort positions in descending order with order given by Key.*
+        positions = sorted(positions, key=partial(Key.naive, state=state), reverse=True)
         for pos in positions:
             new_state = state.next_state(pos)
             yield (0, new_state)
@@ -106,6 +125,11 @@ class Knight(Problem):
 
         :param state: the current state
         """
+        # for r in state.grid:
+        #     for v in r:
+        #         if v == NOT_VISITED_TILE:
+        #             return False
+        # return True
         return state.n_visited == state.nRows * state.nCols
 
 
@@ -144,14 +168,14 @@ class State:
         :param position: the new position (y, x)
         """
         prev_y, prev_x = self.y, self.x
-        st = State(self.shape, position, grid=self.grid, n_visited=self.n_visited)
+        st = State(self.shape, position, grid=self.grid,
+                n_visited=self.n_visited+1)
         st.grid[prev_y][prev_x] = VISITED_TILE
-        self.n_visited += 1
         return st
 
     def __str__(self):
         """__str__."""
-        print(f"nRows {self.nRows} :: nCols {self.nCols}")
+        # print(f"nRows {self.nRows} :: nCols {self.nCols}")
         n_sharp = 2 * self.nCols + 1
         s = ("#" * n_sharp) + "\n"
         for i in range(self.nRows):
