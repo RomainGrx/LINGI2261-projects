@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 13, 12:10:58
-@last modified : 2021 Feb 20, 17:13:13
+@last modified : 2021 Feb 21, 23:24:31
 """
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
@@ -23,6 +23,7 @@ NOT_VISITED_TILE = " "
 #   Key class   #
 #################
 
+
 class Key:
     @classmethod
     def naive(cls, position, state):
@@ -37,7 +38,6 @@ class Key:
     def border(cls, position, state):
         """Give the distance between the current position and the closest
         border
-
         :param position: possible next position (y, x)
         :param state: current state
         """
@@ -59,7 +59,7 @@ class Key:
         y, x = position
         count = 0
         for dy, dx in Knight.AVAILABLE_MOVES:
-            yy, xx = y+dy, x+dx
+            yy, xx = y + dy, x + dx
             if Knight.valid_pos(yy, xx, state):
                 count += 1
         return count
@@ -111,7 +111,9 @@ class Knight(Problem):
                 positions.append(new_pos)
 
         # Sort positions in descending order with order given by Key.*
-        positions = sorted(positions, key=partial(Key.neighbors, state=state), reverse=True)
+        positions = sorted(
+            positions, key=partial(Key.neighbors, state=state), reverse=True
+        )
         for pos in positions:
             new_state = state.next_state(pos)
             yield (0, new_state)
@@ -141,14 +143,10 @@ class State:
         """
         self.shape = self.nRows, self.nCols = shape
         self.n_visited = n_visited
-        self.grid = []
-        for i in range(self.nRows):
-            self.grid.append([" "] * self.nCols)
-
-        if grid is not None:
-            for i in range(self.nRows):
-                for j in range(self.nCols):
-                    self.grid[i][j] = grid[i][j]
+        if grid is None:
+            self.grid = [[" " for i in range(self.nCols)] for j in range(self.nRows)]
+        else:
+            self.grid = [[v for v in r] for r in grid]
 
         self.init_pos = self.y, self.x = init_pos
         self.grid[self.y][self.x] = KNIGHT
@@ -160,8 +158,7 @@ class State:
         :param position: the new position (y, x)
         """
         prev_y, prev_x = self.y, self.x
-        st = State(self.shape, position, grid=self.grid,
-                n_visited=self.n_visited+1)
+        st = State(self.shape, position, grid=self.grid, n_visited=self.n_visited + 1)
         st.grid[prev_y][prev_x] = VISITED_TILE
         return st
 
@@ -182,8 +179,24 @@ class State:
         s += "#" * n_sharp
         return s
 
+    def __eq__(self, other):
+        if (
+            (self.n_visited != other.n_visited)
+            or (self.x != other.x)
+            or (self.y != other.y)
+        ):
+            return False
+        for i in range(self.nRows):
+            for j in range(self.nCols):
+                if self.grid[i][j] != other.grid[i][j]:
+                    return False
+        return True
 
-INGINIOUS = False
+    def __hash__(self):
+        return hash(str(self))
+
+
+INGINIOUS = True
 
 if __name__ == "__main__":
     if not INGINIOUS:
@@ -205,7 +218,7 @@ if __name__ == "__main__":
 
             # example of bfs tree search
             startTime = time.perf_counter()
-            #node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
+            # node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
             node, nb_explored, remaining_nodes = depth_first_tree_search(problem)
             endTime = time.perf_counter()
 
@@ -236,8 +249,8 @@ if __name__ == "__main__":
 
         # example of bfs tree search
         startTime = time.perf_counter()
-        node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
-        #node, nb_explored, remaining_nodes = depth_first_tree_search(problem)
+        # node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
+        node, nb_explored, remaining_nodes = depth_first_tree_search(problem)
         endTime = time.perf_counter()
 
         # example of print
