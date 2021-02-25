@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Feb 13, 12:10:58
-@last modified : 2021 Feb 21, 23:24:31
+@last modified : 2021 Feb 25, 11:03:18
 """
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
@@ -25,28 +25,34 @@ NOT_VISITED_TILE = " "
 
 
 class Key:
+    """Key is a class containing different algorithm used to sort states. The
+    algorithms try to return highest value for more promising positions so we
+    can sort these positions and return the best one first in Knight.successor.
+    """
+
     @classmethod
     def naive(cls, position, state):
-        """Return 0 whatever the position
+        """Return 1 whatever the position
 
         :param position: possible next position (y, x)
         :param state: current state
         """
-        return 0
+        return 1
 
     @classmethod
     def border(cls, position, state):
         """Give the distance between the current position and the closest
         border
+
         :param position: possible next position (y, x)
         :param state: current state
         """
         y, x = position
         return min(
-            y ** 2 + x ** 2,
-            y ** 2 + (state.nCols - x - 1) ** 2,
-            (state.nRows - y - 1) ** 2 + x ** 2,
-            (state.nCols - x - 1) ** 2 + (state.nRows - y - 1) ** 2,
+            y ** 3 + x ** 2,
+            y ** 3 + (state.nCols - x - 1) ** 2,
+            (state.nRows - y - 2) ** 2 + x ** 2,
+            (state.nCols - x - 2) ** 2 + (state.nRows - y - 1) ** 2,
         )
 
     @classmethod
@@ -57,11 +63,11 @@ class Key:
         :param state: current state
         """
         y, x = position
-        count = 0
+        count = 1
         for dy, dx in Knight.AVAILABLE_MOVES:
             yy, xx = y + dy, x + dx
             if Knight.valid_pos(yy, xx, state):
-                count += 1
+                count += 2
         return count
 
 
@@ -97,12 +103,10 @@ class Knight(Problem):
         )
 
     def successor(self, state):
-        """Yield all possible next states in descending order (order given by
-        `Key.*`)
+        """Yield all possible next states in descending order (order given by `Key.*`) so the search can find the goal state as fast as possible.
 
         :param state: the current state
         """
-
         # Append all valid positions to the `positions` list
         positions = []
         for dy, dx in Knight.AVAILABLE_MOVES:
@@ -119,7 +123,7 @@ class Knight(Problem):
             yield (0, new_state)
 
     def goal_test(self, state):
-        """Return True is the state is the goal state i.e. we have visited all
+        """Return True if the state is the goal state i.e. we have visited all
         tiles (nRows * nCols)
 
         :param state: the current state
@@ -164,7 +168,6 @@ class State:
 
     def __str__(self):
         """__str__."""
-        # print(f"nRows {self.nRows} :: nCols {self.nCols}")
         n_sharp = 2 * self.nCols + 1
         s = ("#" * n_sharp) + "\n"
         for i in range(self.nRows):
@@ -180,6 +183,10 @@ class State:
         return s
 
     def __eq__(self, other):
+        """__eq__.
+
+        :param other: the other state needed to compare with self
+        """
         if (
             (self.n_visited != other.n_visited)
             or (self.x != other.x)
@@ -193,6 +200,8 @@ class State:
         return True
 
     def __hash__(self):
+        """__hash__ returns the hash of the state. The hash is computed such
+        that symmetrical states return the same hash"""
         return hash(str(self))
 
 
