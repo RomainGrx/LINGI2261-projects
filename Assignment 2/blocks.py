@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 10, 12:15:10
+@last modified : 2021 Mar 10, 15:05:20
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
@@ -30,11 +30,7 @@ class Blocks(Problem):
     @staticmethod
     def valid_position(state, pos):
         y, x = pos
-        return (
-            0 <= y < state.nbr
-            and 0 <= x < state.nbc
-            and state[y,x] == Blocks.VOID
-        )
+        return 0 <= y < state.nbr and 0 <= x < state.nbc and state[y, x] == Blocks.VOID
 
     @staticmethod
     def apply_gravity(state, pos):
@@ -47,6 +43,11 @@ class Blocks(Problem):
             y += 1
         return (y, x)
 
+    def movable_blocks(self, state):
+        for (y, x), cls in state.blocks.items():
+            if self.goal[y, x] != cls.upper():
+                yield y, x
+
     def successor(self, state):
         """successor.
         return the successor (i.e. all possible moves for each block instance)
@@ -56,55 +57,66 @@ class Blocks(Problem):
 
         :param state:
         """
-        for block_id, (y, x) in enumerate(state.blocks):
+        if self.goal is None:
+            self.goal = goal_state
+        for y, x in self.movable_blocks(state):
             for dy, dx in Blocks.AVAILABLE_MOVES:
                 new_pos = y + dy, x + dx
                 if Blocks.valid_position(state, new_pos):
                     new_pos = Blocks.apply_gravity(state, new_pos)
-                    yield 0, state.new_state(block_id, new_pos, (y,x))
+                    yield 0, state.new_state(new_pos, (y, x))
 
     def goal_test(self, state):
-        return state == self.goal
+        for (y, x), cls in self.goal.blocks.items():
+            if state[y, x] != cls.lower():
+                return False
+        return True
 
 
 ###############
 # State class #
 ###############
 class State:
-    def __init__(self, grid):
+    walls, nbr, nbc = None, None, None
+
+    def __init__(self, grid=None, blocks=None):
+        assert grid is not None or blocks is not None, "need at least one argument"
         if isinstance(grid, dict):
-            self.grid = grid
+            self.blocks = grid
         else:
-            self.nbr = len(grid)
-            self.nbc = len(grid[0])
+            State.nbr = len(grid)
+            State.nbc = len(grid[0])
             grid = np.array(grid)
-            self.blocks = np.array(
-                np.argwhere(
-                    np.logical_and(grid != Blocks.WALL, grid != Blocks.VOID)
+
+            blocks_idx = np.array(
+                np.argwhere(np.logical_and(grid != Blocks.WALL, grid != Blocks.VOID))
+            )
+            walls_idx = np.array(np.argwhere(grid == Blocks.WALL))
+
+            self.blocks = dict(
+                zip(
+                    [(y, x) for y, x in blocks_idx],
+                    [grid[y, x] for y, x in blocks_idx],
                 )
             )
-            self.walls = np.array(np.argwhere(grid == Blocks.WALL))
 
-            self.grid = {
-                **dict(zip([(y, x) for y, x in self.walls], [Blocks.WALL] * len(self.walls))),
-                **dict(zip([(y, x) for y, x in self.blocks], [grid[y, x] for
-                    y, x in self.blocks])),
-                }
+            State.walls = dict(
+                zip([(y, x) for y, x in walls_idx], [Blocks.WALL] * len(walls_idx))
+            )
 
-    def new_state(self, block_id, new_pos, prev_pos=None):
+    def new_state(self, new_pos, prev_pos=None):
         y, x = new_pos
 
-        newgrid = self.grid.copy()
-        newgrid[new_pos] = self[prev_pos]
-        del newgrid[prev_pos]
+        new_blocks = self.blocks.copy()
+        new_blocks[new_pos] = self[prev_pos]
+        del new_blocks[prev_pos]
 
-        new_state = State(newgrid)
-        new_state.nbr = self.nbr
-        new_state.nbc = self.nbc
+        new_state = State(grid=new_blocks)
+
         return new_state
 
     def __getitem__(self, attr):
-        return self.grid.get(attr, Blocks.VOID)
+        return self.blocks.get(attr, None) or State.walls.get(attr, Blocks.VOID)
 
     def __str__(self):
         n_sharp = self.nbc + 2
@@ -120,7 +132,8 @@ class State:
 
     def __eq__(self, other):
         assert self.nbc == other.nbc and self.nbr == other.nbr
-        return self.grid == other.grid
+        assert isinstance(other, State)
+        return self.blocks == other.blocks
 
 
 ######################
@@ -247,6 +260,7 @@ if __name__ == "__main__":
             init_state = State(grid_init)
             goal_state = State(grid_goal)
             problem = Blocks(init_state, goal_state)
+            print(problem.goal_test(goal_state))
             print(init_state, "\n" * 2)
             for _, new_state in problem.successor(init_state):
                 print(new_state)
