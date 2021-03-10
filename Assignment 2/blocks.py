@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 10, 15:05:20
+@last modified : 2021 Mar 10, 17:13:08
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
@@ -11,7 +11,7 @@
                            Romain Graux <romain.graux@student.uclouvain.be>"""
 
 INGINIOUS = False
-MYTEST = True
+MYTEST = False
 
 import numpy as np
 from search import *
@@ -57,8 +57,8 @@ class Blocks(Problem):
 
         :param state:
         """
-        if self.goal is None:
-            self.goal = goal_state
+        if State.goal is None:
+            State.goal = self.goal
         for y, x in self.movable_blocks(state):
             for dy, dx in Blocks.AVAILABLE_MOVES:
                 new_pos = y + dy, x + dx
@@ -77,7 +77,7 @@ class Blocks(Problem):
 # State class #
 ###############
 class State:
-    walls, nbr, nbc = None, None, None
+    walls, nbr, nbc, goal = None, None, None, None
 
     def __init__(self, grid=None, blocks=None):
         assert grid is not None or blocks is not None, "need at least one argument"
@@ -103,6 +103,10 @@ class State:
             State.walls = dict(
                 zip([(y, x) for y, x in walls_idx], [Blocks.WALL] * len(walls_idx))
             )
+
+            del grid
+            del blocks_idx
+            del walls_idx
 
     def new_state(self, new_pos, prev_pos=None):
         y, x = new_pos
@@ -135,6 +139,15 @@ class State:
         assert isinstance(other, State)
         return self.blocks == other.blocks
 
+    def __hash__(self):
+        unique_blocks = np.unique(list(self.blocks.values()))
+        CODEX = dict(zip(unique_blocks, np.arange(len(unique_blocks))))
+        n_bits = int(np.ceil(np.log2(len(unique_blocks))))
+        hashh = 0
+        for (y, x), cls in self.blocks.items():
+            hashh += (self.nbr * y + x) * n_bits + CODEX[cls]
+        return int(hashh)
+
 
 ######################
 # Auxiliary function #
@@ -152,9 +165,7 @@ def readInstanceFile(filename):
 ######################
 def heuristic(node):
     h = 0.0
-    # ...
-    # compute an heuristic value
-    # ...
+
     return h
 
 
@@ -260,7 +271,10 @@ if __name__ == "__main__":
             init_state = State(grid_init)
             goal_state = State(grid_goal)
             problem = Blocks(init_state, goal_state)
-            print(problem.goal_test(goal_state))
             print(init_state, "\n" * 2)
             for _, new_state in problem.successor(init_state):
                 print(new_state)
+            h = init_state.__hash__()
+            print(h)
+            h = goal_state.__hash__()
+            print(h)
