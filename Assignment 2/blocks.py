@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 10, 10:47:36
+@last modified : 2021 Mar 10, 12:15:10
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
@@ -33,14 +33,14 @@ class Blocks(Problem):
         return (
             0 <= y < state.nbr
             and 0 <= x < state.nbc
-            and state.grid[y, x] == Blocks.VOID
+            and state[y,x] == Blocks.VOID
         )
 
     @staticmethod
     def apply_gravity(state, pos):
         def have_support(state, pos):
             y, x = pos
-            return y == (state.nbr - 1) or state.grid[y + 1, x] == Blocks.WALL
+            return y == (state.nbr - 1) or state[y + 1, x] == Blocks.WALL
 
         y, x = pos
         while not have_support(state, (y, x)):
@@ -61,10 +61,10 @@ class Blocks(Problem):
                 new_pos = y + dy, x + dx
                 if Blocks.valid_position(state, new_pos):
                     new_pos = Blocks.apply_gravity(state, new_pos)
-                    yield 0, state.new_state(block_id, new_pos)
+                    yield 0, state.new_state(block_id, new_pos, (y,x))
 
     def goal_test(self, state):
-        pass
+        return state == self.goal
 
 
 ###############
@@ -72,25 +72,39 @@ class Blocks(Problem):
 ###############
 class State:
     def __init__(self, grid):
-        self.nbr = len(grid)
-        self.nbc = len(grid[0])
-        self.grid = np.array(grid)
-        self.blocks = np.array(
-            np.argwhere(
-                np.logical_and(self.grid != Blocks.WALL, self.grid != Blocks.VOID)
+        if isinstance(grid, dict):
+            self.grid = grid
+        else:
+            self.nbr = len(grid)
+            self.nbc = len(grid[0])
+            grid = np.array(grid)
+            self.blocks = np.array(
+                np.argwhere(
+                    np.logical_and(grid != Blocks.WALL, grid != Blocks.VOID)
+                )
             )
-        )
+            self.walls = np.array(np.argwhere(grid == Blocks.WALL))
 
-    def new_state(self, block_id, new_pos):
+            self.grid = {
+                **dict(zip([(y, x) for y, x in self.walls], [Blocks.WALL] * len(self.walls))),
+                **dict(zip([(y, x) for y, x in self.blocks], [grid[y, x] for
+                    y, x in self.blocks])),
+                }
+
+    def new_state(self, block_id, new_pos, prev_pos=None):
         y, x = new_pos
-        prev_y, prev_x = self.blocks[block_id]
-        cls = self.grid[prev_y, prev_x]
-        new_grid = self.grid.copy()
-        # if new_grid[y, x] != Blocks.VOID:
-        #     raise Exception(f"Not void position for {y, x} :: {new_grid[y, x]}")
-        new_grid[prev_y, prev_x] = Blocks.VOID
-        new_grid[y, x] = cls
-        return State(new_grid)
+
+        newgrid = self.grid.copy()
+        newgrid[new_pos] = self[prev_pos]
+        del newgrid[prev_pos]
+
+        new_state = State(newgrid)
+        new_state.nbr = self.nbr
+        new_state.nbc = self.nbc
+        return new_state
+
+    def __getitem__(self, attr):
+        return self.grid.get(attr, Blocks.VOID)
 
     def __str__(self):
         n_sharp = self.nbc + 2
@@ -98,11 +112,15 @@ class State:
         for i in range(self.nbr):
             s += "#"
             for j in range(self.nbc):
-                s = s + str(self.grid[i][j])
+                s = s + str(self[i, j])
             s += "#"
             if i < self.nbr - 1:
                 s += "\n"
         return s + "\n" + "#" * n_sharp
+
+    def __eq__(self, other):
+        assert self.nbc == other.nbc and self.nbr == other.nbr
+        return self.grid == other.grid
 
 
 ######################
@@ -155,7 +173,7 @@ if __name__ == "__main__":
             grid_init, grid_goal = readInstanceFile(instance)
             init_state = State(grid_init)
             goal_state = State(grid_goal)
-            problem = Blocks(init_state)
+            problem = Blocks(init_state, goal_state)
 
             # example of bfs tree search
             startTime = time.perf_counter()
@@ -186,7 +204,7 @@ if __name__ == "__main__":
         grid_init, grid_goal = readInstanceFile(instance)
         init_state = State(grid_init)
         goal_state = State(grid_goal)
-        problem = Blocks(init_state)
+        problem = Blocks(init_state, goal_state)
 
         # example of bfs graph search
         startTime = time.perf_counter()
@@ -227,7 +245,8 @@ if __name__ == "__main__":
         for instance in [instances_path + name for name in instance_names]:
             grid_init, grid_goal = readInstanceFile(instance)
             init_state = State(grid_init)
-            problem = Blocks(init_state)
+            goal_state = State(grid_goal)
+            problem = Blocks(init_state, goal_state)
             print(init_state, "\n" * 2)
             for _, new_state in problem.successor(init_state):
                 print(new_state)
