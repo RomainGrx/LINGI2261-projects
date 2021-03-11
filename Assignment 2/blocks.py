@@ -3,15 +3,18 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 11, 01:29:48
+@last modified : 2021 Mar 11, 09:29:38
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
                            Vincent Buccilli <vincent.buccilli@student.uclouvain.be>
                            Romain Graux <romain.graux@student.uclouvain.be>"""
+# TODO: Prune dead states
+# TODO: implement heuristic class
+# TODO: change hash with ASCII
 
 INGINIOUS = False
-MYTEST = True
+MYTEST = False
 
 import numpy as np
 from search import *
@@ -25,8 +28,13 @@ goal_state = None
 class Blocks(Problem):
     WALL = "#"
     VOID = " "
+    FIXED = "@"
     AVAILABLE_MOVES = [(0, -1), (0, 1)]  # i.e. LEFT, RIGHT
-    
+
+    def __init__(self, init_state, goal_state=None):
+        State.goal = goal_state
+        super(Blocks, self).__init__(init_state, goal_state)
+
     @staticmethod
     def borders(state, pos):
         y, x = pos
@@ -38,31 +46,44 @@ class Blocks(Problem):
         return Blocks.borders(state, pos) and state[y, x] == Blocks.VOID
 
     @staticmethod
-    def move_and_apply_gravity(state, pos, prev_pos):
-        def have_support(state, pos):
-            y, x = pos
-            return y == (state.nbr - 1) or state[y + 1, x] != Blocks.VOID
+    def have_support(state, pos):
+        y, x = pos
+        return y == (state.nbr - 1) or state[y + 1, x] != Blocks.VOID
 
+    @staticmethod
+    def move_and_apply_gravity(state, pos, prev_pos):
         def inner_apply_gravity(state, pos, prev_pos=None):
             iy, _ = y, x = pos
-            while not have_support(state, (y, x)):
+            while not Blocks.have_support(state, (y, x)):
                 y += 1
-            return state.new_state((y, x), prev_pos or pos) 
+            return state.new_state((y, x), prev_pos or pos)
 
         next_state = inner_apply_gravity(state, pos, prev_pos)
 
         iy, ix = prev_pos
         blocks = 1
-        while Blocks.borders(next_state, (iy-blocks, ix)) and next_state.blocks.get((iy-blocks, ix), "VOID") != "VOID":
-            next_state = inner_apply_gravity(next_state, (iy-blocks, ix))
+        while Blocks.borders(next_state, (iy - blocks, ix)) and next_state.blocks.get(
+            (iy - blocks, ix), "VOID"
+        ) not in (Blocks.FIXED, "VOID"):
+            next_state = inner_apply_gravity(next_state, (iy - blocks, ix))
             blocks += 1
-        
+
         return next_state
 
     def movable_blocks(self, state):
         for (y, x), cls in state.blocks.items():
             if self.goal[y, x] != cls.upper():
                 yield y, x
+
+    @staticmethod
+    def is_dead_state(state):
+        def lower_than_goal():
+            return False
+
+        def splitted_map():
+            return False
+
+        return lower_than_goal() and splitted_map()
 
     def successor(self, state):
         """successor.
@@ -73,18 +94,17 @@ class Blocks(Problem):
 
         :param state:
         """
-        if State.goal is None:
-            State.goal = self.goal
         for y, x in self.movable_blocks(state):
             for dy, dx in Blocks.AVAILABLE_MOVES:
                 new_pos = y + dy, x + dx
                 if Blocks.valid_position(state, new_pos):
                     next_state = Blocks.move_and_apply_gravity(state, new_pos, (y, x))
-                    yield 0, next_state
+                    if not Blocks.is_dead_state(next_state):
+                        yield 0, next_state
 
     def goal_test(self, state):
         for (y, x), cls in self.goal.blocks.items():
-            if state[y, x] != cls.lower():
+            if not state.is_at_goal((y, x)):
                 return False
         return True
 
@@ -132,8 +152,21 @@ class State:
         del new_blocks[prev_pos]
 
         new_state = State(grid=new_blocks)
+        if new_state.is_at_goal(new_pos):
+            new_state.blocks[new_pos] = Blocks.FIXED
 
         return new_state
+
+    def is_at_goal(self, position):
+        cls = self.blocks.get(position)
+        if cls == Blocks.FIXED:
+            return True
+
+        cls_goal = self.goal.blocks.get(position)
+        if cls_goal is not None:
+            if cls_goal.lower() == cls:
+                return True
+        return False
 
     def __getitem__(self, attr):
         return self.blocks.get(attr, None) or State.walls.get(attr, Blocks.VOID)
@@ -156,12 +189,13 @@ class State:
         return self.blocks == other.blocks
 
     def __hash__(self):
-        unique_blocks = np.unique(list(self.blocks.values()))
-        CODEX = dict(zip(unique_blocks, np.arange(len(unique_blocks))))
-        n_bits = int(np.ceil(np.log2(len(unique_blocks))))
+        # unique_blocks = np.unique(list(self.blocks.values()))
+        # CODEX = dict(zip(unique_blocks, np.arange(len(unique_blocks))))
+        # n_bits = int(np.ceil(np.log2(len(unique_blocks))))
+        n_bits = 8  # ASCII
         hashh = 0
         for (y, x), cls in self.blocks.items():
-            hashh += (self.nbr * y + x) * n_bits + CODEX[cls]
+            hashh += (self.nbr * y + x) * n_bits + ord(cls)
         return int(hashh)
 
 
@@ -179,10 +213,40 @@ def readInstanceFile(filename):
 ######################
 # Heuristic function #
 ######################
-def heuristic(node):
-    h = 0.0
 
-    return h
+
+class Heuristic:
+    @staticmethod
+    def at_good_position(node):
+        h = 0.0
+        state = node.state
+        for cls in state.blocks.values():
+            if cls == Blocks.FIXED:
+                h += 1
+        return h
+
+    @staticmethod
+    def how_many_fill_block(node):
+        h = 0.0
+        state = node.state
+        for (y, x), cls in state.goal.blocks.items():
+            if not state.is_at_goal((y, x)):
+                blocks = 1
+                while not Blocks.have_support(state, (y + blocks, x)):
+                    h += 1
+                    blocks += 1
+        return h
+
+
+def heuristic(node):
+    hs = list(
+        map(
+            lambda f: f(node),
+            [Heuristic.at_good_position, Heuristic.how_many_fill_block],
+        )
+    )
+
+    return np.max(hs)
 
 
 ##############################
@@ -290,3 +354,5 @@ if __name__ == "__main__":
             print(init_state, "\n" * 2)
             for idx, (_, new_state) in enumerate(problem.successor(init_state)):
                 print(new_state)
+                print(problem.goal_test(new_state))
+                print(hash(new_state))
