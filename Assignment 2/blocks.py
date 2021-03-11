@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 11, 09:29:38
+@last modified : 2021 Mar 11, 11:15:56
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
@@ -237,16 +237,45 @@ class Heuristic:
                     blocks += 1
         return h
 
+    @staticmethod
+    def manhattan(node):
+        def distance(pos1, pos2):
+            return np.abs(pos1[0] - pos2[0]) + np.abs(pos1[1] - pos2[1])
+
+        state = node.state
+        goal = state.goal
+
+        # Change the mapping to cls of the block -> a list of all positions in the grid
+        cls_to_pos = defaultdict(list)
+        for pos, cls in state.blocks.items():
+            cls_to_pos[cls].append(pos)
+
+        def closest(goal_position, goal_cls):
+            """closest.
+
+            :param goal_position: y, x of the goal position
+            :param goal_cls: the block class of the goal
+            """
+            list_pos = cls_to_pos.get(goal_cls)
+            if list_pos is not None:
+                all_pos = list(map(lambda pos: distance(goal_position, pos), list_pos))
+                return min(all_pos)
+
+        all_closest_distances = [
+            closest(pos, cls) for pos, cls in goal.blocks.items()
+        ]  # Iterate over all goal positions (return the closest distance for each goal)
+        return max(all_closest_distances, default=0)
+
 
 def heuristic(node):
-    hs = list(
-        map(
-            lambda f: f(node),
-            [Heuristic.at_good_position, Heuristic.how_many_fill_block],
-        )
-    )
-
-    return np.max(hs)
+    # hs = list(
+    #     map(
+    #         lambda f: f(node),
+    #         [Heuristic.at_good_position, Heuristic.how_many_fill_block],
+    #     )
+    # )
+    # return np.max(hs)
+    return Heuristic.manhattan(node)
 
 
 ##############################
