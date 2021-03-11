@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 10, 17:13:08
+@last modified : 2021 Mar 11, 01:29:48
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
@@ -11,7 +11,7 @@
                            Romain Graux <romain.graux@student.uclouvain.be>"""
 
 INGINIOUS = False
-MYTEST = False
+MYTEST = True
 
 import numpy as np
 from search import *
@@ -26,22 +26,38 @@ class Blocks(Problem):
     WALL = "#"
     VOID = " "
     AVAILABLE_MOVES = [(0, -1), (0, 1)]  # i.e. LEFT, RIGHT
+    
+    @staticmethod
+    def borders(state, pos):
+        y, x = pos
+        return 0 <= y < state.nbr and 0 <= x < state.nbc
 
     @staticmethod
     def valid_position(state, pos):
         y, x = pos
-        return 0 <= y < state.nbr and 0 <= x < state.nbc and state[y, x] == Blocks.VOID
+        return Blocks.borders(state, pos) and state[y, x] == Blocks.VOID
 
     @staticmethod
-    def apply_gravity(state, pos):
+    def move_and_apply_gravity(state, pos, prev_pos):
         def have_support(state, pos):
             y, x = pos
-            return y == (state.nbr - 1) or state[y + 1, x] == Blocks.WALL
+            return y == (state.nbr - 1) or state[y + 1, x] != Blocks.VOID
 
-        y, x = pos
-        while not have_support(state, (y, x)):
-            y += 1
-        return (y, x)
+        def inner_apply_gravity(state, pos, prev_pos=None):
+            iy, _ = y, x = pos
+            while not have_support(state, (y, x)):
+                y += 1
+            return state.new_state((y, x), prev_pos or pos) 
+
+        next_state = inner_apply_gravity(state, pos, prev_pos)
+
+        iy, ix = prev_pos
+        blocks = 1
+        while Blocks.borders(next_state, (iy-blocks, ix)) and next_state.blocks.get((iy-blocks, ix), "VOID") != "VOID":
+            next_state = inner_apply_gravity(next_state, (iy-blocks, ix))
+            blocks += 1
+        
+        return next_state
 
     def movable_blocks(self, state):
         for (y, x), cls in state.blocks.items():
@@ -63,8 +79,8 @@ class Blocks(Problem):
             for dy, dx in Blocks.AVAILABLE_MOVES:
                 new_pos = y + dy, x + dx
                 if Blocks.valid_position(state, new_pos):
-                    new_pos = Blocks.apply_gravity(state, new_pos)
-                    yield 0, state.new_state(new_pos, (y, x))
+                    next_state = Blocks.move_and_apply_gravity(state, new_pos, (y, x))
+                    yield 0, next_state
 
     def goal_test(self, state):
         for (y, x), cls in self.goal.blocks.items():
@@ -272,9 +288,5 @@ if __name__ == "__main__":
             goal_state = State(grid_goal)
             problem = Blocks(init_state, goal_state)
             print(init_state, "\n" * 2)
-            for _, new_state in problem.successor(init_state):
+            for idx, (_, new_state) in enumerate(problem.successor(init_state)):
                 print(new_state)
-            h = init_state.__hash__()
-            print(h)
-            h = goal_state.__hash__()
-            print(h)
