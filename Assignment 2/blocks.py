@@ -3,7 +3,7 @@
 """
 @author : Romain Graux
 @date : 2021 Mar 10, 09:20:31
-@last modified : 2021 Mar 11, 11:15:56
+@last modified : 2021 Mar 11, 16:24:58
 """
 
 """NAMES OF THE AUTHOR(S): Gael Aglin <gael.aglin@uclouvain.be>
@@ -13,13 +13,15 @@
 # TODO: implement heuristic class
 # TODO: change hash with ASCII
 
-INGINIOUS = False
+INGINIOUS = True
 MYTEST = False
+BENCHMARK = False
 
-import numpy as np
 from search import *
 import sys
 import time
+import numpy as np
+from collections import defaultdict
 
 goal_state = None
 #################
@@ -37,21 +39,49 @@ class Blocks(Problem):
 
     @staticmethod
     def borders(state, pos):
+        """borders.
+        return True if the positon `pos` is between the borders else False
+
+        :param state: the state containing the blocks, goal and walls
+        :param pos: (y, x)
+        """
         y, x = pos
         return 0 <= y < state.nbr and 0 <= x < state.nbc
 
     @staticmethod
     def valid_position(state, pos):
+        """valid_position.
+        return True if the position `pos` is between the borders and free else
+        False
+
+        :param state: the state containing the blocks, goal and walls
+        :param pos: (y, x)
+        """
         y, x = pos
         return Blocks.borders(state, pos) and state[y, x] == Blocks.VOID
 
     @staticmethod
     def have_support(state, pos):
+        """have_support.
+        return True if the block at position `pos` is supported by a WALL, a
+        border or another block.
+
+        :param state:
+        :param pos:
+        """
         y, x = pos
         return y == (state.nbr - 1) or state[y + 1, x] != Blocks.VOID
 
     @staticmethod
     def move_and_apply_gravity(state, pos, prev_pos):
+        """move_and_apply_gravity.
+        apply the gravity for a position and block above the previous position
+
+        :param state:
+        :param pos:
+        :param prev_pos: y, x of the previous position
+        """
+
         def inner_apply_gravity(state, pos, prev_pos=None):
             iy, _ = y, x = pos
             while not Blocks.have_support(state, (y, x)):
@@ -71,25 +101,130 @@ class Blocks(Problem):
         return next_state
 
     def movable_blocks(self, state):
+        """movable_blocks.
+        return all movable blocks (not at goal position)
+
+        :param state:
+        """
         for (y, x), cls in state.blocks.items():
-            if self.goal[y, x] != cls.upper():
+            if cls != Blocks.FIXED:
                 yield y, x
 
     @staticmethod
     def is_dead_state(state):
+        """is_dead_state.
+        return if the state is a dead state or not
+
+        :param state:
+        """
+
         def lower_than_goal():
+            """lower_than_goal.
+            check if at least one block is above the highest goal block
+            """
+
+            def naive():
+                blocks_y = [y for y, x in state.blocks.keys()]
+                goals_y = [y for y, x in state.goal.blocks.keys()]
+                if min(blocks_y) > min(goals_y):
+                    return True
+                return False
+
+            return naive()
+
+        def possible_positions():
+            """possible_positions.
+            check if the goal blocks are still accessible by the corresponding
+            blocks
+            """
+
+            def bfs(init):
+                """bfs.
+                return the position visited by the bfs
+
+                :param init: the initial position (goal position) y, x
+                """
+
+                def get_neighbors(pos):
+                    """get_neighbors.
+                    return the neighbors of the position `pos` (left, right and
+                    upper direction)
+
+                    :param pos:
+                    """
+                    y, x = pos
+                    moves = [(0, -1), (0, 1), (-1, 0)]
+                    neighbors = []
+                    for dy, dx in moves:
+                        yy, xx = y + dy, x + dx
+                        if (
+                            0 <= yy < state.nbr
+                            and 0 <= xx < state.nbc
+                            and state[(yy, xx)] not in (Blocks.WALL, Blocks.FIXED)
+                        ):
+                            neighbors.append((yy, xx))
+                    return neighbors
+
+                visited = set()
+                queue = [init]
+
+                while queue:
+                    node = queue.pop(0)
+                    if node not in visited:
+                        visited.add(node)
+                        neighbors = get_neighbors(node)
+                        for neighbor in neighbors:
+                            queue.append(neighbor)
+                return visited
+
+            # compute the accessible positions for each goal block
+            goal_accessible = defaultdict(list)
+            for pos, cls in state.goal.blocks.items():
+                if not state.is_at_goal(pos):
+                    goal_accessible[cls.lower()].append(bfs(pos))
+
+            # for each block, check if they are accessible by the goal block of
+            # the same class (for each goal block)
+            set_cls = defaultdict(list)
+            for pos, cls in state.blocks.items():
+                if state.is_at_goal(pos):
+                    continue
+                n_poss = 0b0
+                for idx, (goal_cls, goal_maps) in enumerate(goal_accessible.items()):
+                    for goal_map in goal_maps:
+                        n_poss += (
+                            1 << idx
+                            if (cls == goal_cls and pos in goal_map)
+                            else 0  # Encode 1 bit per goal block if accessible
+                        )
+                set_cls[cls].append(n_poss)
+
+            for cls, list_poss in set_cls.items():
+                len_goals = len(goal_accessible[cls])
+
+                # No goal for this class
+                if len_goals == 0:
+                    continue
+
+                b = 0b0
+                for bits in list_poss:
+                    b = b | bits
+                if b < (
+                    2 ** (len_goals - 1)
+                ):  # check if at least one goal position can not be accessed by a block
+                    return True
+
             return False
 
-        def splitted_map():
-            return False
-
-        return lower_than_goal() and splitted_map()
+        return lower_than_goal() or possible_positions()
 
     def successor(self, state):
         """successor.
         return the successor (i.e. all possible moves for each block instance)
-        - identify position of all blocks (return only blocks not touching a
-          goal position)
+
+        drop :
+            - blocks already at goal position
+            - dead states
         - try all possible moves :: check validity + apply gravity
 
         :param state:
@@ -129,6 +264,7 @@ class State:
             )
             walls_idx = np.array(np.argwhere(grid == Blocks.WALL))
 
+            # Encode the blocks as a hash map :: position -> the block class(a, b, ...)
             self.blocks = dict(
                 zip(
                     [(y, x) for y, x in blocks_idx],
@@ -136,6 +272,7 @@ class State:
                 )
             )
 
+            # Encode the walls as hash map :: position -> WALL (#)
             State.walls = dict(
                 zip([(y, x) for y, x in walls_idx], [Blocks.WALL] * len(walls_idx))
             )
@@ -147,11 +284,13 @@ class State:
     def new_state(self, new_pos, prev_pos=None):
         y, x = new_pos
 
+        # Update the new position
         new_blocks = self.blocks.copy()
         new_blocks[new_pos] = self[prev_pos]
         del new_blocks[prev_pos]
 
         new_state = State(grid=new_blocks)
+        # Set as fixed block if is at goal
         if new_state.is_at_goal(new_pos):
             new_state.blocks[new_pos] = Blocks.FIXED
 
@@ -159,6 +298,7 @@ class State:
 
     def is_at_goal(self, position):
         cls = self.blocks.get(position)
+
         if cls == Blocks.FIXED:
             return True
 
@@ -189,14 +329,12 @@ class State:
         return self.blocks == other.blocks
 
     def __hash__(self):
-        # unique_blocks = np.unique(list(self.blocks.values()))
-        # CODEX = dict(zip(unique_blocks, np.arange(len(unique_blocks))))
-        # n_bits = int(np.ceil(np.log2(len(unique_blocks))))
-        n_bits = 8  # ASCII
-        hashh = 0
+        return hash(str(self))
+        n_bits = 8  # ASCII encoding
+        h = 0
         for (y, x), cls in self.blocks.items():
-            hashh += (self.nbr * y + x) * n_bits + ord(cls)
-        return int(hashh)
+            h += (self.nbr * y + x) * n_bits + ord(cls)
+        return int(h)
 
 
 ######################
@@ -240,7 +378,7 @@ class Heuristic:
     @staticmethod
     def manhattan(node):
         def distance(pos1, pos2):
-            return np.abs(pos1[0] - pos2[0]) + np.abs(pos1[1] - pos2[1])
+            return np.abs(pos1[1] - pos2[1])
 
         state = node.state
         goal = state.goal
@@ -256,10 +394,13 @@ class Heuristic:
             :param goal_position: y, x of the goal position
             :param goal_cls: the block class of the goal
             """
-            list_pos = cls_to_pos.get(goal_cls)
+            if state.is_at_goal(goal_position):
+                return 0
+            list_pos = cls_to_pos.get(goal_cls.lower())
             if list_pos is not None:
                 all_pos = list(map(lambda pos: distance(goal_position, pos), list_pos))
                 return min(all_pos)
+            return 0
 
         all_closest_distances = [
             closest(pos, cls) for pos, cls in goal.blocks.items()
@@ -286,7 +427,7 @@ def heuristic(node):
 
 if __name__ == "__main__":
 
-    if not INGINIOUS and not MYTEST:
+    if not INGINIOUS and not MYTEST and not BENCHMARK:
         instances_path = "instances/"
         instance_names = [
             "a01",
@@ -327,7 +468,7 @@ if __name__ == "__main__":
             print("* Path cost to goal:\t", node.depth, "moves")
             print("* #Nodes explored:\t", nb_explored)
             print("* Queue size at goal:\t", remaining_nodes)
-    elif INGINIOUS and not MYTEST:
+    elif INGINIOUS and not MYTEST and not BENCHMARK:
 
         ####################################
         # Launch the search for INGInious  #
@@ -341,7 +482,8 @@ if __name__ == "__main__":
 
         # example of bfs graph search
         startTime = time.perf_counter()
-        node, nb_explored, remaining_nodes = astar_graph_search(problem, heuristic)
+        # node, nb_explored, remaining_nodes = astar_graph_search(problem, heuristic)
+        node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
         endTime = time.perf_counter()
 
         # example of print
@@ -358,11 +500,37 @@ if __name__ == "__main__":
         print("* Path cost to goal:\t", node.depth, "moves")
         print("* #Nodes explored:\t", nb_explored)
         print("* Queue size at goal:\t", remaining_nodes)
+    elif BENCHMARK:
+        instance = sys.argv[1]
+        grid_init, grid_goal = readInstanceFile(instance)
+        init_state = State(grid_init)
+        goal_state = State(grid_goal)
+        problem = Blocks(init_state, goal_state)
+
+        # example of bfs graph search
+        startTime = time.perf_counter()
+        node, nb_explored, remaining_nodes = astar_graph_search(problem, heuristic)
+        # node, nb_explored, remaining_nodes = breadth_first_graph_search(problem)
+        endTime = time.perf_counter()
+
+        # example of print
+        path = node.path()
+        path.reverse()
+
+        args = [
+            str(endTime - startTime),
+            str(node.depth),
+            str(nb_explored),
+            str(remaining_nodes),
+        ]
+        s = ",".join(args)
+        print(s)
+
     else:
         instances_path = "instances/"
         instance_names = [
-            "mine",
-            # "a01",
+            # "mine",
+            "a01",
             # "a02",
             # "a03",
             # "a04",
@@ -372,8 +540,11 @@ if __name__ == "__main__":
             # "a08",
             # "a09",
             # "a10",
-            # "a11",
         ]
+
+        class Node:
+            def __init__(self, state):
+                self.state = state
 
         for instance in [instances_path + name for name in instance_names]:
             grid_init, grid_goal = readInstanceFile(instance)
@@ -382,6 +553,6 @@ if __name__ == "__main__":
             problem = Blocks(init_state, goal_state)
             print(init_state, "\n" * 2)
             for idx, (_, new_state) in enumerate(problem.successor(init_state)):
+                print("=" * 50)
                 print(new_state)
-                print(problem.goal_test(new_state))
-                print(hash(new_state))
+                print(heuristic(Node(new_state)))
