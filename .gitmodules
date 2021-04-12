@@ -1,3 +1,3 @@
 [submodule "Assignment 3/MAIC2020-Seega"]
 	path = Assignment 3/MAIC2020-Seega
-	url = https://github.com/MIFY-AI/MAIC2020-Seega
+	url = git@github.com:RomainGrx/MAIC2020-Seega.git
