@@ -1,33 +1,99 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 @author : Romain Graux
-@date : 2021 Mar 30, 10:13:15
-@last modified : 2021 Apr 22, 11:45:03
+@date : 2021 Apr 15, 10:48:24
+@last modified : 2021 Apr 22, 12:30:54
 """
-
 
 import numpy as np
 from core.player import Player, Color
 from seega.seega_rules import SeegaRules
-from seega.seega_actions import SeegaAction
+from seega.seega_actions import SeegaAction, SeegaActionType
 from copy import deepcopy
 from time import perf_counter
 from collections import defaultdict
 
+
+import os
 import math
+import torch
+import torch.utils.model_zoo
 import logging
+import numpy as np
+from enum import Enum
 
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
+
+
+class ContestAgent:
+    _color_to_int = np.vectorize(lambda color: color.value)
+
+    def __init__(self, model_url: str):
+        self._model = torch.utils.model_zoo.load_url(
+            model_url, map_location="cpu"
+        ).eval()
+
+    def _action_from_1D_to_3D(self, index: int):
+        z = index // (self.nrow * self.ncol)
+        index -= z * self.nrow * self.ncol
+        y = index // self.nrow
+        x = index % self.nrow
+        return x, y, z
+
+    def _action_from_3D_to_SeegaAction(self, action):
+        x, y, z = action
+        at = (x, y)
+        dx, dy = Action.get_dx(z)
+        to = (x + dx, y + dy)
+        return SeegaAction(SeegaActionType.MOVE, at=at, to=to)
+
+    def _state_to_ndarray(self, state):
+        return self._color_to_int(state.board.get_board_state())
+
+    def __call__(self, state):
+        self.nrow, self.ncol = state.board.board_shape
+        board = self._state_to_ndarray(state)
+        inputs = {"obs": torch.tensor(board).view(1, -1)}
+        with torch.no_grad():
+            outputs = self._model(inputs)[0][0]
+
+        return outputs.numpy()
+
+    def _state_to_actions(self, state, reverse):
+        self.nrow, self.ncol = state.board.board_shape
+        board = self._state_to_ndarray(state)
+        inputs = {"obs": torch.tensor(board).view(1, -1)}
+        with torch.no_grad():
+            outputs = self._model(inputs)[0][0]
+            actions_sorted = torch.argsort(outputs, descending=reverse).numpy()
+        actions_3D_sorted = list(map(self._action_from_1D_to_3D, actions_sorted))
+        actions_SeegaAction_sorted = list(
+            map(self._action_from_3D_to_SeegaAction, actions_3D_sorted)
+        )
+        return actions_SeegaAction_sorted
+
+
+class Action(Enum):
+    LEFT = 0
+    UP = 1
+    RIGHT = 2
+    DOWN = 3
+
+    @staticmethod
+    def get_dx(action):
+        return [(-1, 0), (0, 1), (1, 0), (0, -1)][action]
 
 
 class AI(Player):
 
     in_hand = 12
     score = 0
-    name = "Smart Agent"
+    name = "Contest Agent"
     _running_depth = 0  # Track the maximum depth in the iterative deepening
     _max_depth = -666
+
+    _model_url = "https://github.com/RomainGrx/LINGI2261-projects/raw/master/Assignment%203/models/latest.pt"
 
     def __init__(self, color):
         super(AI, self).__init__(color)
@@ -37,6 +103,7 @@ class AI(Player):
         self._remaining_time = float("inf")
         self._total_time = None
         self._tracking_list = defaultdict(lambda: 0)
+        self._agent = ContestAgent(model_url=self._model_url)
 
     def play(self, state, remain_time):
         print("")
@@ -67,7 +134,6 @@ class AI(Player):
             return schedulers[policy]
 
         self._max_running_time = time_policy("exponential")
-        print(self._max_running_time)
 
         # Begining the search
         self._start_minimax = perf_counter()
@@ -101,6 +167,9 @@ class AI(Player):
             / state.MAX_SCORE
         )
 
+    def _action_eq(self, a, b):
+        return a.action_type == b.action_type and a.action == b.action
+
     def successors(self, state):
         """successors.
         The successors function must return (or yield) a list of pairs (a, s) in which a is the action played to reach the state s.
@@ -114,14 +183,20 @@ class AI(Player):
         if not is_our_turn and self._already_tracked(state):
             return list()
 
-        for action in SeegaRules.get_player_actions(state, next_player):
+        official_actions = SeegaRules.get_player_actions(state, next_player)
+        nn_actions = self._agent._state_to_actions(state, reverse=not is_our_turn)
+        print(nn_actions)
+        actions = list(
+            filter(
+                lambda x: any([self._action_eq(x, a) for a in official_actions]),
+                nn_actions,
+            )
+        )
+
+        for action in actions:
             next_state = deepcopy(state)
             if SeegaRules.act(next_state, action, next_player):
                 successors.append((action, next_state))
-
-        # Sort states with their evaulation values (reverse : min/max)
-        successors.sort(key=lambda x: self.evaluate(x[1]), reverse=not is_our_turn)
-        # logging.info(f'Next states for {["oponent", "us"][is_our_turn]} -> {successors}')
 
         # Get all not already tracked states if loosing and is our turn
         if is_our_turn and self._alpha_winning(state) < 0.5:
@@ -180,6 +255,23 @@ class AI(Player):
         def player_wins(player):
             return state.score[player] == state.MAX_SCORE
 
+        def border_gravity(player):
+            def is_border(cell):
+                x, y = cell
+                m, n = state.board.board_shape
+                return x == 0 or y == 0 or x == m - 1 or y == n - 1
+
+            return sum(
+                list(
+                    map(
+                        is_border,
+                        state.board.get_player_pieces_on_board(
+                            Color.green if Color.green.value == player else Color.black
+                        ),
+                    )
+                )
+            )
+
         def evaluate_cells(color):
             def is_player_cell(cell, color):
                 return state.board.get_cell_color(cell) == color
@@ -222,6 +314,9 @@ class AI(Player):
 
             score += evaluate_cells(self.color)
             score -= evaluate_cells(self.oponent)
+
+            # score += border_gravity(self.position) / state.MAX_SCORE
+            # score -= border_gravity(-self.position) / state.MAX_SCORE
 
             # Winning state
             if SeegaRules.is_end_game(state):
