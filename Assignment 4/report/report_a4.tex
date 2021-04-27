@@ -1,0 +1,216 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage{marvosym}
+
+\assignment{4}
+\group{...}
+\students{..........}{..........}
+
+\begin{document}
+
+\maketitle
+
+\section{The bin packing problem (13 pts)}
+
+\begin{enumerate}
+\item Formulate the bin packing problem as a Local Search problem (problem, cost function, feasible solutions, optimal solutions). \textbf{(1 pt)}
+\end{enumerate}
+
+\begin{answers}[6cm]
+% Your answer here
+\end{answers}
+
+
+\begin{enumerate}
+\setcounter{enumi}{1}
+    \item You are given a template on Moodle: \textit{binpacking.py}. Implement your own extension of the \textit{Problem} class from \texttt{aima-python3}. Implement the \texttt{maxvalue} and \texttt{randomized maxvalue} strategies. To do so,	you can get inspiration from the \textit{randomwalk} function in \textit{search.py}. Your program will be evaluated on 15 instances (during 1 minute) of which 5 are hidden. We expect you to solve at least 12 out the 15.
+    \begin{enumerate}
+        \item \texttt{maxvalue} chooses the best node (i.e., the node with minimum
+        value) in the neighborhood, even if it degrades the quality of the current solution. 
+        The \texttt{maxvalue} strategy should be defined in a function called
+        \textit{maxvalue} with the following signature: \\
+        \texttt{maxvalue(problem,limit=100,callback=None)}. \textbf{(2.5 pts)}
+    \end{enumerate}
+\end{enumerate}
+
+\begin{answers}[2.5 cm]
+% IN CASE YOU WANT TO SPECIFY ANY COMMENTS ABOUT YOUR IMPLEMENTATION
+\end{answers}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{1}
+\begin{enumerate}
+\setcounter{enumii}{1}
+    \item \texttt{randomized maxvalue} chooses the next node randomly among
+        the 5~best neighbors (again, even if it degrades the quality of the current solution).
+        The \texttt{randomized maxvalue} strategy should be defined in a function called
+        \textit{randomized\_maxvalue} with the following signature: \\
+        \texttt{randomized\_maxvalue(problem,limit=100,callback=None)}. \textbf{(2.5 pts)}
+\end{enumerate}
+\end{enumerate}
+
+\begin{answers}[2.5 cm]
+% IN CASE YOU WANT TO SPECIFY ANY COMMENTS ABOUT YOUR IMPLEMENTATION
+\end{answers}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{2}
+\item Compare the 2 strategies implemented in the previous question and \texttt{randomwalk} defined in \textit{search.py} on the given bin packing instances. Report, in a table, the computation time, the value of the best solution (in term of fitness) and the number of steps needed to reach the best result. For the randomized max value and the random walk, each instance should be tested 10~times to reduce the effects of the randomness on the result. When multiple runs of the same instance are executed, report the mean of the quantities. \textbf{(3 pts)}
+\end{enumerate}
+
+\begin{answers}[7cm]
+% Your answer here
+\begin{center}
+\begin{tabular}{||l||l|l|l||l|l|l||l|l|l||}
+\hline
+\multirow{3}{*}{Inst.} & \multicolumn{3}{c||}{Max value} & \multicolumn{3}{c||}{Random max value} & \multicolumn{3}{c||}{Random walk} \\
+\cline{2-10}
+\cline{2-10}
+ & T(s) & Fit. & NS & T(s) & Fit. & NS & T(s) & Fit. & NS\\
+\hline
+i01 & & & & & & & & &\\
+\hline
+i02 & & & & & & & & &\\
+\hline
+i03 & & & & & & & & &\\
+\hline
+i04 & & & & & & & & &\\
+\hline
+i05 & & & & & & & & &\\
+\hline
+i06 & & & & & & & & &\\
+\hline
+i07 & & & & & & & & &\\
+\hline
+i08 & & & & & & & & &\\
+\hline
+i09 & & & & & & & & &\\
+\hline
+i10 & & & & & & & & &\\
+\hline
+\end{tabular}
+\end{center}
+\textbf{NS}: Number of steps — \textbf{T}: Time — \textbf{Fit.}: Fitness
+\end{answers}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{3}
+    \item \textbf{(4 pts)} Answer the following questions:
+    \begin{enumerate}
+        \item What is the best strategy? \textbf{(1 pt)}
+    \end{enumerate}
+\end{enumerate}
+
+\begin{answers}[1.5cm]
+% Your answer here
+\end{answers}
+
+
+\newpage
+\begin{enumerate}
+\setcounter{enumi}{3}
+\begin{enumerate}
+\setcounter{enumii}{1}
+    \item Why do you think the best strategy beats the other ones? \textbf{(1 pt)}
+\end{enumerate}
+\end{enumerate}
+
+\begin{answers}[2.5cm]
+% Your answer here
+\end{answers}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{3}
+\begin{enumerate}
+\setcounter{enumii}{2}
+    \item What are the limitations of each strategy in terms of diversification 
+    and intensification? \textbf{(1 pt)}
+\end{enumerate}
+\end{enumerate}
+
+\begin{answer}
+% Your answer here
+\end{answer}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{3}
+\begin{enumerate}
+\setcounter{enumii}{2}
+    \item What is the behavior of the different techniques when they fall 
+    in a local optimum? \textbf{(1 pt)}
+\end{enumerate}
+\end{enumerate}
+
+\begin{answer}
+% Your answer here
+\end{answer}
+
+
+
+
+\section{Propositional Logic (7 pts)}
+
+\subsection{Models and Logical Connectives (1 pt)}
+Consider the vocabulary with four propositions $A$, $B$, $C$ and $D$ and the
+following sentences:
+\begin{itemize}
+\item $(\neg A \lor C) \land (\neg B \lor C)$
+\item $(C \Rightarrow \neg A) \land \neg(B \lor C)$
+\item $(\neg A \lor B) \land \neg (B \Rightarrow \neg C) \land \neg (\neg D \Rightarrow A)$
+\end{itemize}
+
+\begin{enumerate}
+  \item For each sentence, give its number of valid interpretations, i.e. the number of times the sentence is true (considering for each sentence {\bf all the proposition variables} $A$, $B$, $C$ and $D$). \textbf{(1 pt)}
+\end{enumerate}
+
+\begin{answer}
+% Your answer here
+\end{answer}
+
+
+
+\subsection{Color Grid Problem (6 pts)}
+
+\begin{enumerate}
+\item Explain how you can express this problem with propositional logic. For each sentence, give its interpretation. \textbf{(2 pts)}
+\end{enumerate}
+
+\begin{answers}[6cm]
+% Your answer here
+\end{answers}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{1}
+\item Translate your model into Conjunctive Normal Form (CNF). \textbf{(2 pts)}
+\end{enumerate}
+
+\begin{answers}[6cm]
+% Your answer here
+\end{answers}
+
+
+
+\begin{enumerate}
+\setcounter{enumi}{2}
+\item Modify the function {\tt get\_expression(size)} in \texttt{cgp\_solver.py} such that it outputs a list
+of clauses modeling the color grid problem for the given input. Submit your code on INGInious inside the \emph{Assignment4: Color Grid  Problem} task. The file \texttt{cgp\_solver.py} is the \emph{only} file that you need to modify to solve this problem. Your program will be evaluated on 10 instances of which 5 are hidden. We expect you to solve at least 8 out the 10. \textbf{(2 pts)}
+\end{enumerate}
+
+\begin{answers}[3cm]
+% IN CASE YOU WANT TO SPECIFY ANY COMMENTS ABOUT YOUR IMPLEMENTATION
+\end{answers}
+
+
+
+\end{document}
