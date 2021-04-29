@@ -165,11 +165,22 @@ def maxvalue(problem, limit=100, callback=None):
 
 
 # Attention : Depending of the objective function you use, your goal can be to maximize or to minimize it
-def randomized_maxvalue(problem, limit=100, callback=None):
+def randomized_maxvalue(problem, limit=100, n=5, callback=None):
     current = LSNode(problem, problem.initial, 0)
     best = current
+    best_value = problem.value(current.state)
 
-    # Put your code here
+    for step in range(limit):
+        neighbours = list(current.expand())
+        values = list(map(lambda n: problem.value(n.state), neighbours))
+        top_idx = np.argpartition(values, -n)[-n:]
+        best_idx = np.random.choice(top_idx)
+
+        current = neighbours[best_idx]
+
+        if values[best_idx] > best_value:
+            best = LSNode(problem, current.state, step + 1)
+            best_value = values[best_idx]
 
     return best
 
@@ -182,6 +193,6 @@ if __name__ == "__main__":
     init_state = State(info[0], info[1])
     bp_problem = BinPacking(init_state)
     step_limit = 100
-    node = maxvalue(bp_problem, step_limit)
+    node = randomized_maxvalue(bp_problem, step_limit)
     state = node.state
     print(state)
